@@ -3,14 +3,6 @@ COLREGs Core + ir-sim 실제 통합 테스트
 
 ir-sim 환경을 사용하여 colregs-core 패키지를 테스트합니다.
 """
-import sys
-import os
-
-# colregs-core 패키지 경로 추가
-sys.path.insert(0, '/home/hyo/colregs-core/src')
-# ir-sim 패키지 경로 추가  
-sys.path.insert(0, '/home/hyo/ir-sim')
-
 try:
     from irsim.env import EnvBase
     from irsim.world import ObjectFactory
@@ -18,7 +10,6 @@ try:
 except ImportError as e:
     print(f"✗ ir-sim import failed: {e}")
     print("Please make sure ir-sim is properly installed")
-    sys.exit(1)
 
 try:
     from colregs_core import (
@@ -31,7 +22,6 @@ try:
     print("✓ colregs-core imported successfully")
 except ImportError as e:
     print(f"✗ colregs-core import failed: {e}")
-    sys.exit(1)
 
 import numpy as np
 
@@ -54,36 +44,38 @@ class COLREGsEnhancedIRSimEnv(EnvBase):
         print("  - Encounter Classifier: Ready")
         print("  - Risk Assessor: Ready")
     
-    def get_colregs_info(self, robot_id='robot0'):
+    def get_colregs_info(self, robot_id=0):
         """
         현재 상태에서 모든 장애물에 대한 COLREGs 정보 반환
         
         Args:
-            robot_id: 로봇 ID (default: 'robot0')
+            robot_id: 로봇 인덱스 (default: 0)
         
         Returns:
             list: 각 장애물에 대한 COLREGs 분석 결과
         """
-        if robot_id not in self.robot_dict:
+        if not hasattr(self, 'robot_list') or len(self.robot_list) <= robot_id:
             return []
         
-        robot = self.robot_dict[robot_id]
+        robot = self.robot_list[robot_id]
         os_position = (robot.state[0], robot.state[1])  # x, y
         os_heading = np.degrees(robot.state[2])  # theta in degrees
-        os_speed = np.linalg.norm([robot.vel[0], robot.vel[1]])  # velocity magnitude
-        os_velocity = (robot.vel[0], robot.vel[1])
+        os_velocity_array = robot.velocity.flatten()
+        os_speed = np.linalg.norm(os_velocity_array[:2])  # velocity magnitude
+        os_velocity = (os_velocity_array[0], os_velocity_array[1])
         
         colregs_info = []
         
-        for obs_name, obs in self.obstacle_dict.items():
+        for i, obs in enumerate(self.obstacle_list):
             # 장애물 상태
             ts_position = (obs.state[0], obs.state[1])
             ts_heading = np.degrees(obs.state[2]) if len(obs.state) > 2 else 0
             
             # 장애물 속도 (있는 경우)
-            if hasattr(obs, 'vel') and obs.vel is not None:
-                ts_velocity = (obs.vel[0], obs.vel[1])
-                ts_speed = np.linalg.norm([obs.vel[0], obs.vel[1]])
+            if hasattr(obs, 'velocity') and obs.velocity is not None:
+                ts_velocity_array = obs.velocity.flatten()
+                ts_velocity = (ts_velocity_array[0], ts_velocity_array[1])
+                ts_speed = np.linalg.norm(ts_velocity_array[:2])
             else:
                 ts_velocity = (0, 0)
                 ts_speed = 0
@@ -107,7 +99,7 @@ class COLREGsEnhancedIRSimEnv(EnvBase):
             )
             
             info = {
-                'obstacle_name': obs_name,
+                'obstacle_name': f'obstacle_{i}',
                 'encounter_type': situation.encounter_type,
                 'relative_bearing': situation.relative_bearing,
                 'distance': situation.distance,
@@ -124,7 +116,7 @@ class COLREGsEnhancedIRSimEnv(EnvBase):
         
         return colregs_info
     
-    def get_most_dangerous_obstacle(self, robot_id='robot0'):
+    def get_most_dangerous_obstacle(self, robot_id=0):
         """가장 위험한 장애물 식별"""
         colregs_info = self.get_colregs_info(robot_id)
         
@@ -156,36 +148,45 @@ def test_basic_integration():
     # ir-sim 환경 생성
     env = COLREGsEnhancedIRSimEnv()
     
+    # ObjectFactory 인스턴스 생성
+    factory = ObjectFactory()
+    
     # 로봇 추가
-    robot = ObjectFactory.create('diff_robot', 
-                                  init_state=[0, 0, 0],
-                                  vel=[2, 0, 0])
-    env.add_robot(robot, robot_id='robot0')
+    robot = factory.create_robot(
+        kinematics={"name": "diff"},
+        shape={"name": "circle", "radius": 0.5},
+        state=[0, 0, 0],
+        vel=[2, 0, 0]
+    )
+    env.add_object(robot)
     
     # 장애물 추가 (head-on 시나리오)
-    obstacle1 = ObjectFactory.create('diff_robot',
-                                      init_state=[0, 50, np.pi],  # 50m ahead, heading south
-                                      vel=[-2, 0, 0])  # moving towards robot
-    env.add_obstacle(obstacle1, obs_id='ship1')
+    obstacle1 = factory.create_obstacle(
+        kinematics={"name": "diff"},
+        shape={"name": "circle", "radius": 0.5},
+        state=[0, 50, np.pi],  # 50m ahead, heading south
+        vel=[-2, 0, 0]  # moving towards robot
+    )
+    env.add_object(obstacle1)
     
     # COLREGs 정보 가져오기
-    colregs_info = env.get_colregs_info('robot0')
+    colregs_info = env.get_colregs_info(0)
     
     print(f"\nObstacles detected: {len(colregs_info)}")
     
     for info in colregs_info:
         print(f"\n{info['obstacle_name']}:")
         print(f"  Encounter Type: {info['encounter_type'].value}")
-        print(f"  Distance: {info['distance']:.1f} m")
-        print(f"  Relative Bearing: {info['relative_bearing']:.1f}°")
+        print(f"  Distance: {float(info['distance']):.1f} m")
+        print(f"  Relative Bearing: {float(info['relative_bearing']):.1f}°")
         print(f"  Risk Level: {info['risk_level'].name}")
-        print(f"  DCPA: {info['dcpa']:.1f} m")
-        print(f"  TCPA: {info['tcpa']:.1f} s")
+        print(f"  DCPA: {float(info['dcpa']):.1f} m")
+        print(f"  TCPA: {float(info['tcpa']):.1f} s")
         print(f"  Action Required: {'YES' if info['requires_action'] else 'NO'}")
         print(f"  COLREGs: {info['colregs_action'][:60]}...")
     
     # 가장 위험한 장애물
-    most_dangerous = env.get_most_dangerous_obstacle('robot0')
+    most_dangerous = env.get_most_dangerous_obstacle(0)
     if most_dangerous:
         print(f"\n⚠️  MOST DANGEROUS: {most_dangerous['obstacle_name']}")
         print(f"   Risk: {most_dangerous['risk_level'].name}")
@@ -201,32 +202,45 @@ def test_multiple_obstacles():
     print("="*70)
     
     env = COLREGsEnhancedIRSimEnv()
+    factory = ObjectFactory()
     
     # Own ship
-    robot = ObjectFactory.create('diff_robot',
-                                  init_state=[0, 0, 0],
-                                  vel=[2, 0, 0])
-    env.add_robot(robot, robot_id='robot0')
+    robot = factory.create_robot(
+        kinematics={"name": "diff"},
+        shape={"name": "circle", "radius": 0.5},
+        state=[0, 0, 0],
+        vel=[2, 0, 0]
+    )
+    env.add_object(robot)
     
     # Obstacle 1: Head-on
-    obs1 = ObjectFactory.create('diff_robot',
-                                 init_state=[0, 30, np.pi],
-                                 vel=[-2, 0, 0])
-    env.add_obstacle(obs1, obs_id='ship1')
+    obs1 = factory.create_obstacle(
+        kinematics={"name": "diff"},
+        shape={"name": "circle", "radius": 0.5},
+        state=[0, 30, np.pi],
+        vel=[-2, 0, 0]
+    )
+    env.add_object(obs1)
     
     # Obstacle 2: Crossing from starboard
-    obs2 = ObjectFactory.create('diff_robot',
-                                 init_state=[30, 30, -np.pi/2],
-                                 vel=[0, -2.5, 0])
-    env.add_obstacle(obs2, obs_id='ship2')
+    obs2 = factory.create_obstacle(
+        kinematics={"name": "diff"},
+        shape={"name": "circle", "radius": 0.5},
+        state=[30, 30, -np.pi/2],
+        vel=[0, -2.5, 0]
+    )
+    env.add_object(obs2)
     
     # Obstacle 3: Safe distance
-    obs3 = ObjectFactory.create('diff_robot',
-                                 init_state=[100, 0, np.pi],
-                                 vel=[-1, 0, 0])
-    env.add_obstacle(obs3, obs_id='ship3')
+    obs3 = factory.create_obstacle(
+        kinematics={"name": "diff"},
+        shape={"name": "circle", "radius": 0.5},
+        state=[100, 0, np.pi],
+        vel=[-1, 0, 0]
+    )
+    env.add_object(obs3)
     
-    colregs_info = env.get_colregs_info('robot0')
+    colregs_info = env.get_colregs_info(0)
     
     print(f"\nTotal obstacles: {len(colregs_info)}")
     
@@ -238,9 +252,9 @@ def test_multiple_obstacles():
         print(f"\n{status} {info['obstacle_name']}: "
               f"{info['encounter_type'].value} - "
               f"{info['risk_level'].name} "
-              f"(D={info['distance']:.0f}m, DCPA={info['dcpa']:.0f}m)")
+              f"(D={float(info['distance']):.0f}m, DCPA={float(info['dcpa']):.0f}m)")
     
-    most_dangerous = env.get_most_dangerous_obstacle('robot0')
+    most_dangerous = env.get_most_dangerous_obstacle(0)
     if most_dangerous:
         print(f"\n🚨 Priority target: {most_dangerous['obstacle_name']}")
         print(f"   Take action: {most_dangerous['colregs_action'][:80]}...")
@@ -255,18 +269,25 @@ def test_dynamic_scenario():
     print("="*70)
     
     env = COLREGsEnhancedIRSimEnv()
+    factory = ObjectFactory()
     
     # Own ship
-    robot = ObjectFactory.create('diff_robot',
-                                  init_state=[0, 0, np.pi/4],
-                                  vel=[2, 2, 0])
-    env.add_robot(robot, robot_id='robot0')
+    robot = factory.create_robot(
+        kinematics={"name": "diff"},
+        shape={"name": "circle", "radius": 0.5},
+        state=[0, 0, np.pi/4],
+        vel=[2, 2, 0]
+    )
+    env.add_object(robot)
     
     # Target ship
-    obs = ObjectFactory.create('diff_robot',
-                                init_state=[50, 0, 3*np.pi/4],
-                                vel=[-2, 2, 0])
-    env.add_obstacle(obs, obs_id='ship1')
+    obs = factory.create_obstacle(
+        kinematics={"name": "diff"},
+        shape={"name": "circle", "radius": 0.5},
+        state=[50, 0, 3*np.pi/4],
+        vel=[-2, 2, 0]
+    )
+    env.add_object(obs)
     
     print("\nTime | Distance | Encounter | Risk | DCPA")
     print("-" * 50)
@@ -274,13 +295,13 @@ def test_dynamic_scenario():
     for step in range(10):
         env.step()
         
-        colregs_info = env.get_colregs_info('robot0')
+        colregs_info = env.get_colregs_info(0)
         if colregs_info:
             info = colregs_info[0]
-            print(f"{step:4d} | {info['distance']:8.1f}m | "
+            print(f"{step:4d} | {float(info['distance']):8.1f}m | "
                   f"{info['encounter_type'].value:15s} | "
                   f"{info['risk_level'].name:8s} | "
-                  f"{info['dcpa']:6.1f}m")
+                  f"{float(info['dcpa']):6.1f}m")
     
     print("\n✅ Test 3 PASSED")
 

@@ -1,0 +1,78 @@
+world:
+  height: 200  # 100m maritime area
+  width: 100   # 100m maritime area
+  step_time: 0.05  # 20Hz simulation
+  sample_time: 0.05  # 20Hz rendering
+  collision_mode: 'reactive'  # Maritime collision avoidance
+
+robot:
+    kinematics: {name: 'otter_usv'}
+    shape: {name: 'rectangle', length: 2.0, width: 1.08}  # Otter USV dimensions
+    behavior: {name: 'dash'}  # Direct navigation
+    state: [-90, 0, 0, 3.0, 0, 0, 0, 0]  # Full 8-DOF state: [x, y, psi, u, v, r, n1, n2]
+    goal: [90, 0, 0]  # Destination
+    vel_min: [-10.0, -10.0]  # Maritime speed limits
+    vel_max: [10.0, 10.0]
+    arrive_mode: position
+    goal_threshold: 3.0  # 2m arrival threshold
+
+    sensors:
+      - type: 'lidar2d'
+        range_min: 0
+        range_max: 70
+        angle_range: 3.14*2  # 360 degrees
+        number: 360
+        noise: True
+        std: 0.08
+        angle_std: 0.1
+        offset: [0, 0, 0]
+        alpha: 0.3
+
+    plot:
+      show_arrow: true
+      show_trajectory: true
+      show_velocity_text: True
+
+obstacle:
+  - number: 1
+    kinematics: {name: 'otter_usv'}
+    behavior: {name: 'dash'}
+    vel_max: [10.0, 10.0]
+    vel_min: [-10.0, -10.0]
+    shape:
+      - {name: 'rectangle', length: 2.0, width: 1.08}  # Otter USV dimensions
+    state: [90, 0, -3.14, 3.0, 0, 0, 0, 0]
+    goal: [-90, 0, -3.14]
+    arrive_mode: position
+    goal_threshold: 3.0  # 2m arrival threshold
+  
+  # Static obstacles
+  - shape: {name: 'circle', radius: 4.0}
+    state: [50, 20, 1]
+    kinematics: {name: 'static'}
+  
+  - shape: {name: 'rectangle', length: 5.0, width: 6.0}
+    state: [80, 50, 1]
+    kinematics: {name: 'static'}
+  
+  - shape: {name: 'rectangle', length: 2.5, width: 10.5}
+    state: [10, 80, 1.3]
+    kinematics: {name: 'static'}
+
+  # Static obstacles
+  - shape: {name: 'circle', radius: 4.0}
+    state: [-50, -20, 1]
+    kinematics: {name: 'static'}
+  
+  - shape: {name: 'rectangle', length: 5.0, width: 6.0}
+    state: [-80, -50, 1]
+    kinematics: {name: 'static'}
+  
+  - shape: {name: 'rectangle', length: 2.5, width: 10.5}
+    state: [-10, -80, 1.3]
+    kinematics: {name: 'static'}
+  
+  # World boundary
+  - shape: {name: 'linestring', vertices: [[-100, -50], [-100, 50], [100, 50], [100, -50], [-100, -50]]}
+    kinematics: {name: 'static'}
+    state: [0, 0, 0]
