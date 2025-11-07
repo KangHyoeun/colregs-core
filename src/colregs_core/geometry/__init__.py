@@ -3,40 +3,44 @@ Geometry utilities for maritime navigation
 """
 
 from .bearings import (
-    normalize_angle,
-    normalize_angle_360,
     calculate_relative_bearing,
-    calculate_distance,
     calculate_relative_velocity,
-    heading_to_velocity,
+    heading_speed_to_velocity,
     velocity_to_heading_speed,
     calculate_aspect_angle,
     calculate_bearing_rate,
 )
 
 from .coordinate_transform import (
-    irsim_to_nav_heading,
-    nav_to_irsim_heading,
-    irsim_velocity_to_nav,
-    nav_velocity_to_irsim,
-    verify_transformation,
+    ned_to_math_heading,
+    math_to_ned_heading,
+    maritime_to_math_position,
+    math_to_maritime_position,
+    maritime_to_math_state,
+    math_to_maritime_state,
+    maritime_relative_angle,
+    math_relative_angle,
+    math_to_maritime_velocity,
+    maritime_to_math_velocity,
 )
 
 __all__ = [
     # bearings
-    'normalize_angle',
-    'normalize_angle_360',
     'calculate_relative_bearing',
-    'calculate_distance',
     'calculate_relative_velocity',
-    'heading_to_velocity',
+    'heading_speed_to_velocity',
     'velocity_to_heading_speed',
     'calculate_aspect_angle',
     'calculate_bearing_rate',
     # coordinate_transform
-    'irsim_to_nav_heading',
-    'nav_to_irsim_heading',
-    'irsim_velocity_to_nav',
-    'nav_velocity_to_irsim',
-    'verify_transformation',
+    'ned_to_math_heading',
+    'math_to_ned_heading',
+    'maritime_to_math_position',
+    'math_to_maritime_position',
+    'maritime_to_math_state',
+    'math_to_maritime_state',
+    'maritime_relative_angle',
+    'math_relative_angle',
+    'math_to_maritime_velocity',
+    'maritime_to_math_velocity',
 ]

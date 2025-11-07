@@ -7,9 +7,9 @@ from typing import Tuple, Optional
 from ..encounter.types import RiskLevel, CollisionRisk
 from ..risk.cpa_tcpa import calculate_cpa_tcpa, is_collision_course
 from ..geometry.bearings import (
-    calculate_distance,
     calculate_bearing_rate
 )
+from ..utils.utils import distance
 
 
 class RiskAssessment:
@@ -91,7 +91,7 @@ class RiskAssessment:
         )
         
         # 현재 거리
-        distance = calculate_distance(os_position, ts_position)
+        current_distance = distance(os_position, ts_position)
         
         # 방위각 변화율
         bearing_rate = calculate_bearing_rate(
@@ -101,14 +101,14 @@ class RiskAssessment:
         
         # 위험도 결정
         risk_level = self._determine_risk_level(
-            dcpa, tcpa, distance, bearing_rate
+            dcpa, tcpa, current_distance, bearing_rate
         )
         
         return CollisionRisk(
             dcpa=dcpa,
             tcpa=tcpa,
             risk_level=risk_level,
-            distance=distance,
+            distance=current_distance,
             bearing_rate=bearing_rate
         )
     

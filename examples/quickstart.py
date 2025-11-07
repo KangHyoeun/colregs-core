@@ -6,9 +6,9 @@ COLREGs Core - Quick Start Example
 from colregs_core import (
     EncounterClassifier,
     RiskAssessment,
-    heading_to_velocity
+    heading_speed_to_velocity
 )
-
+import numpy as np
 
 def main():
     print("=" * 60)
@@ -23,15 +23,15 @@ def main():
     print("\n[Ship Information]")
     
     # Own Ship
-    os_position = (0, 0)
+    os_position = np.array([[-90], [0]])
     os_heading = 0      # North
-    os_speed = 10       # m/s
+    os_speed = 6       # m/s
     print(f"Own Ship: pos={os_position}, hdg={os_heading}°, spd={os_speed}m/s")
     
     # Target Ship
-    ts_position = (800, 800)
-    ts_heading = 270    # West
-    ts_speed = 12       # m/s
+    ts_position = np.array([[-60], [0]])
+    ts_heading = 0    # North
+    ts_speed = 4       # m/s
     print(f"Target Ship: pos={ts_position}, hdg={ts_heading}°, spd={ts_speed}m/s")
     
     # 3. Encounter 분류
@@ -51,8 +51,8 @@ def main():
     
     # 4. 위험도 평가
     print("\n[Risk Assessment]")
-    os_velocity = heading_to_velocity(os_heading, os_speed)
-    ts_velocity = heading_to_velocity(ts_heading, ts_speed)
+    os_velocity = heading_speed_to_velocity(os_heading, os_speed)
+    ts_velocity = heading_speed_to_velocity(ts_heading, ts_speed)
     
     risk = risk_assessor.assess(
         os_position=os_position,

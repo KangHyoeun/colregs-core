@@ -11,19 +11,24 @@ from .risk.risk_matrix import RiskAssessment
 from .risk.cpa_tcpa import calculate_cpa_tcpa, is_collision_course
 from .geometry.bearings import (
     calculate_relative_bearing,
-    calculate_distance,
     calculate_aspect_angle,
-    normalize_angle,
-    normalize_angle_360,
-    heading_to_velocity
+    heading_speed_to_velocity,
+    velocity_to_heading_speed,
+    calculate_bearing_rate
 )
 from .geometry.coordinate_transform import (
-    irsim_to_nav_heading,
-    nav_to_irsim_heading,
-    irsim_velocity_to_nav,
-    nav_velocity_to_irsim,
-    verify_transformation
+    ned_to_math_heading,
+    math_to_ned_heading,
+    maritime_to_math_position,
+    math_to_maritime_position,
+    maritime_to_math_state,
+    math_to_maritime_state,
+    maritime_relative_angle,
+    math_relative_angle,
+    math_to_maritime_velocity,
+    maritime_to_math_velocity
 )
+from .utils.utils import WrapTo180, WrapTo360, distance, dist_hypot
 
 __version__ = "0.1.0"
 __author__ = "Maritime Robotics Lab"
@@ -43,16 +48,22 @@ __all__ = [
     "calculate_cpa_tcpa",
     "is_collision_course",
     "calculate_relative_bearing",
-    "calculate_distance",
     "calculate_aspect_angle",
-    "normalize_angle",
-    "normalize_angle_360",
-    "heading_to_velocity",
-    
-    # Coordinate transformation
-    "irsim_to_nav_heading",
-    "nav_to_irsim_heading",
-    "irsim_velocity_to_nav",
-    "nav_velocity_to_irsim",
-    "verify_transformation"
+    "heading_speed_to_velocity",
+    "velocity_to_heading_speed",
+    "calculate_bearing_rate",
+    "ned_to_math_heading",
+    "math_to_ned_heading",
+    "maritime_to_math_position",
+    "math_to_maritime_position",
+    "maritime_to_math_state",
+    "math_to_maritime_state",
+    "maritime_relative_angle",
+    "math_relative_angle",
+    "math_to_maritime_velocity",
+    "maritime_to_math_velocity",
+    "WrapTo180",
+    "WrapTo360",
+    "distance",
+    "dist_hypot",
 ]
