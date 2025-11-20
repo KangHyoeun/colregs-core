@@ -25,22 +25,36 @@ Date: 2025-10-27
 
 import numpy as np
 from typing import Tuple
-from colregs_core.utils.utils import WrapTo180, WrapTo360
+from ..utils import WrapTo180, WrapTo360
 from math import pi, atan2, sin, cos, sqrt
-import numpy as np
-import math
 
 # ========================================
 # Heading Conversion Functions  
 # ========================================
 
 def ned_to_math_heading(ned_deg: float) -> float:
-
+    """
+    Convert heading from NED (maritime) coordinate system to math coordinate system.
+    
+    Args:
+        ned_deg: Heading in NED coordinates (degrees, 0=North, CW)
+    
+    Returns:
+        Heading in math coordinates (degrees, 0=East, CCW)
+    """
     return WrapTo180(90.0 - ned_deg)
 
 
 def math_to_ned_heading(math_deg: float) -> float:
-
+    """
+    Convert heading from math coordinate system to NED (maritime) coordinate system.
+    
+    Args:
+        math_deg: Heading in math coordinates (degrees, 0=East, CCW)
+    
+    Returns:
+        Heading in NED coordinates (degrees, 0=North, CW)
+    """
     return WrapTo180(90.0 - math_deg)
 
 # ========================================
@@ -48,17 +62,45 @@ def math_to_ned_heading(math_deg: float) -> float:
 # ========================================
 
 def maritime_to_math_position(x_north: float, y_east: float) -> Tuple[float, float]:
-
+    """
+    Convert position from maritime/NED coordinates to math coordinates.
+    
+    Args:
+        x_north: North component (NED x-axis)
+        y_east: East component (NED y-axis)
+    
+    Returns:
+        (x_east, y_north) in math coordinates
+    """
     return y_east, x_north
 
 
 def math_to_maritime_position(x_east: float, y_north: float) -> Tuple[float, float]:
-
+    """
+    Convert position from math coordinates to maritime/NED coordinates.
+    
+    Args:
+        x_east: East component (math x-axis)
+        y_north: North component (math y-axis)
+    
+    Returns:
+        (x_north, y_east) in NED coordinates
+    """
     return y_north, x_east
 
 
-def maritime_to_math_state(state_maritime: np.array) -> np.array:
-
+def maritime_to_math_state(state_maritime: np.ndarray) -> np.ndarray:
+    """
+    Convert state vector from maritime/NED coordinates to math coordinates.
+    
+    Args:
+        state_maritime: State vector in NED coordinates (2x1 or 3x1)
+                       [x_north, y_east] or [x_north, y_east, heading_deg]
+    
+    Returns:
+        State vector in math coordinates (2x1 or 3x1)
+        [x_east, y_north] or [x_east, y_north, heading_deg]
+    """
     if state_maritime.shape[0] >= 2:
         x_math, y_math = maritime_to_math_position(
             state_maritime[0, 0], state_maritime[1, 0]
@@ -73,8 +115,18 @@ def maritime_to_math_state(state_maritime: np.array) -> np.array:
     return state_maritime
 
 
-def math_to_maritime_state(state_math: np.array) -> np.array:
-
+def math_to_maritime_state(state_math: np.ndarray) -> np.ndarray:
+    """
+    Convert state vector from math coordinates to maritime/NED coordinates.
+    
+    Args:
+        state_math: State vector in math coordinates (2x1 or 3x1)
+                   [x_east, y_north] or [x_east, y_north, heading_deg]
+    
+    Returns:
+        State vector in NED coordinates (2x1 or 3x1)
+        [x_north, y_east] or [x_north, y_east, heading_deg]
+    """
     if state_math.shape[0] >= 2:
         x_maritime, y_maritime = math_to_maritime_position(
             state_math[0, 0], state_math[1, 0]
@@ -89,34 +141,68 @@ def math_to_maritime_state(state_math: np.array) -> np.array:
     return state_math
 
 def maritime_relative_angle(dx_north: float, dy_east: float) -> float:
-
-    angle_deg = atan2(dy_east, dx_north)
-    return WrapTo180(angle_deg)
+    """
+    Calculate relative angle from displacement in maritime/NED coordinates.
+    
+    Args:
+        dx_north: North component of displacement
+        dy_east: East component of displacement
+    
+    Returns:
+        Angle in degrees [0, 360) from North, clockwise
+    """
+    return WrapTo360(np.degrees(np.atan2(dy_east, dx_north)))
 
 
 def math_relative_angle(dx_east: float, dy_north: float) -> float:
+    """
+    Calculate relative angle from displacement in math coordinates.
     
-    angle_deg = atan2(dy_north, dx_east)
-    return WrapTo180(angle_deg)
+    Args:
+        dx_east: East component of displacement
+        dy_north: North component of displacement
+    
+    Returns:
+        Angle in degrees [0, 360) from East, counter-clockwise
+    """
+    return WrapTo360(np.degrees(np.atan2(dy_north, dx_east)))
 
 # ========================================
 # Velocity Conversion Functions  
 # ========================================
 
 def math_to_maritime_velocity(math_deg: float, speed: float) -> Tuple[float, float]:
-
+    """
+    Convert velocity from math coordinate system to maritime/NED coordinates.
+    
+    Args:
+        math_deg: Heading in math coordinates (degrees, 0=East, CCW)
+        speed: Speed magnitude (m/s)
+    
+    Returns:
+        (vx_north, vy_east) velocity components in NED coordinates
+    """
     heading_rad = np.radians(math_deg)
-    vx = speed * np.cos(heading_rad)
-    vy = speed * np.sin(heading_rad)
-    return (vx, vy)
+    vx_north = speed * np.sin(heading_rad)
+    vy_east = speed * np.cos(heading_rad)
+    return (vx_north, vy_east)
 
 
 def maritime_to_math_velocity(maritime_deg: float, speed: float) -> Tuple[float, float]:
-
+    """
+    Convert velocity from maritime/NED coordinates to math coordinate system.
+    
+    Args:
+        maritime_deg: Heading in NED coordinates (degrees, 0=North, CW)
+        speed: Speed magnitude (m/s)
+    
+    Returns:
+        (vx_east, vy_north) velocity components in math coordinates
+    """
     heading_rad = np.radians(maritime_deg)
-    vx = speed * np.sin(heading_rad)
-    vy = speed * np.cos(heading_rad)
-    return (vx, vy)
+    vx_east = speed * np.sin(heading_rad)
+    vy_north = speed * np.cos(heading_rad)
+    return (vx_east, vy_north)
 
 # ========================================
 # Test Functions  
@@ -180,13 +266,13 @@ def verify_transformation():
     speed = 10.0
     
     for math_h, _, direction in test_cases_180[:4]:  # 주요 4방향만
-        vx, vy = math_to_maritime_velocity(math_h, speed)
+        vx_north, vy_east = math_to_maritime_velocity(math_h, speed)
         
-        # math 좌표계에서의 예상 벡터
-        math_vx = speed * np.cos(np.radians(math_h))
-        math_vy = speed * np.sin(np.radians(math_h))
+        # maritime 좌표계에서의 예상 벡터
+        maritime_vx = speed * np.sin(np.radians(math_h))
+        maritime_vy = speed * np.cos(np.radians(math_h))
         
-        vector_match = (abs(vx - math_vx) < 1e-6 and abs(vy - math_vy) < 1e-6)
+        vector_match = (abs(vx_north - maritime_vx) < 1e-6 and abs(vy_east - maritime_vy) < 1e-6)
         
         if vector_match:
             status = "✓"
@@ -194,7 +280,7 @@ def verify_transformation():
             status = "✗"
             all_passed = False
         
-        print(f"{status} {direction:12s}: math {math_h:6.1f}° → velocity ({vx:6.2f}, {vy:6.2f}) m/s")
+        print(f"{status} {direction:12s}: math {math_h:6.1f}° → velocity ({vx_north:6.2f}, {vy_east:6.2f}) m/s")
     
     print("="*60)
     

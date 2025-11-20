@@ -1,84 +1,117 @@
 # COLREGs Core
 
-**Maritime Encounter Classification and Collision Risk Assessment**
+A Python library for calculating maritime collision risk and shaping rewards for DRL-based navigation, based on the International Regulations for Preventing Collisions at Sea (COLREGs).
 
-항해 규칙(COLREGs)에 기반한 선박 조우 상황 분류 및 충돌 위험 평가 패키지입니다.
+This library provides modular components for assessing encounter situations and calculating rewards, designed for easy integration into DRL training environments like `DRL-otter-navigation`.
 
-## Features
+## Key Features
 
-### 1. Encounter Situation Classification (Rule 13, 14, 15)
-- **Head-on**: 정면 조우 (Rule 14)
-- **Overtaking**: 추월 상황 (Rule 13)
-- **Crossing**: 횡단 상황 (Rule 15)
-  - Give-way vessel (피항선)
-  - Stand-on vessel (유지선)
+-   **Multiple Reward Strategies:** Implements several reward calculation schemes from maritime robotics research, including:
+    -   `ChunRewardCalculator`: A multi-component reward function balancing efficiency and safety.
+    -   `JeonRewardCalculator`: A reward function based on a dynamic ship domain and collision risk.
+-   **Collision Risk Modeling:** Includes the `JeonCollisionRisk` model, which uses concepts like TCPA, DCPA, and a dynamic ship domain to quantify collision risk.
+-   **Easy Integration:** Designed to be easily instantiated and called within a DRL agent or environment's step function.
 
-### 2. Collision Risk Assessment
-- **CPA/TCPA**: Closest Point of Approach & Time to CPA
-- **DCPA**: Distance at CPA
-- **Risk Level**: Low / Medium / High / Critical
+---
 
 ## Installation
 
+This project is managed with `poetry`.
+
 ```bash
-cd colregs-core
+# Navigate to the project directory
+cd /home/hyo/colregs-core
+
+# Activate your conda environment
+conda activate DRL-otter-nav
+
+# Install dependencies
 poetry install
 ```
 
-## Quick Start
+---
+
+## Core Components & Usage
+
+The primary components you will use for DRL are the **Reward Calculators**. They encapsulate the complexity of risk assessment and COLREGs compliance into a single, easy-to-use-interface.
+
+### 1. `JeonRewardCalculator`
+
+This calculator uses the `JeonCollisionRisk` model to shape rewards. It heavily penalizes actions that lead to a high collision risk.
+
+**Usage:**
 
 ```python
-from colregs_core import EncounterClassifier, RiskAssessment, heading_to_velocity
+from colregs_core.reward import JeonRewardCalculator
 
-# 1. 초기화
-classifier = EncounterClassifier()
-risk_assessor = RiskAssessment()
-
-# 2. Encounter 분류
-situation = classifier.classify(
-    os_position=(0, 0),
-    os_heading=0,
-    os_speed=10,
-    ts_position=(1000, 500),
-    ts_heading=270,
-    ts_speed=12
+# Initialize the calculator
+# Speed parameters are for calibrating the risk model
+jeon_calculator = JeonRewardCalculator(
+    os_speed_for_cr=2.0,
+    ts_speed_for_cr=2.0,
+    w_dist=0.3,
+    w_coll=0.7
 )
 
-print(f"Encounter: {situation.encounter_type}")
-print(f"Distance: {situation.distance:.2f} m")
-
-# 3. 충돌 위험 평가
-from colregs_core.geometry import heading_to_velocity
-
-os_vel = heading_to_velocity(0, 10)
-ts_vel = heading_to_velocity(270, 12)
-
-risk = risk_assessor.assess(
+# In your environment's step function, calculate the reward
+reward_dict = jeon_calculator.calculate_total_reward(
     os_position=(0, 0),
-    os_velocity=os_vel,
-    ts_position=(1000, 500),
-    ts_velocity=ts_vel
+    os_velocity=(2.0, 0.0),
+    ts_position=(200, 0),
+    ts_velocity=(-2.0, 0.0),
+    dist_to_goal=50.0,
+    is_static_obstacle=False
 )
 
-print(f"Risk: {risk.risk_level.name}")
-print(f"DCPA: {risk.dcpa:.2f}m, TCPA: {risk.tcpa:.2f}s")
-
-# 4. 권장 조치
-if risk.requires_action:
-    action = risk_assessor.get_recommended_action(risk)
-    print(f"Action: {action}")
+total_reward = reward_dict['r_total']
 ```
 
-더 많은 예제는 `examples/` 디렉토리를 참고하세요.
+### 2. `ChunRewardCalculator`
 
-## Installation
+This calculator provides a more granular reward, composed of distinct "efficiency" and "safety" components.
 
-```bash
-cd colregs-core
-pip install -e .
+**Usage:**
+
+```python
+from colregs_core.reward import ChunRewardCalculator
+
+# Initialize the calculator
+chun_calculator = ChunRewardCalculator(
+    d_max=20.0,
+    v_ref=2.0,
+    w_goal=0.4,
+    w_cross=0.2,
+    w_speed=0.2,
+    w_risk=0.2
+)
+
+# In your environment's step function, calculate the reward
+reward_dict = chun_calculator.calculate_total_reward(
+    goal_position=(1000, 0),
+    os_position=(0, 0),
+    os_velocity=(2.0, 0.0),
+    previous_distance=1000.0,
+    encounter_type=0, # Replace with actual encounter type
+    CR_max=0.1,
+    is_static_obstacle=False,
+    ts_position=(200, 0),
+    ts_velocity=(-2.0, 0.0),
+    os_heading=0.0
+)
+
+total_reward = reward_dict['r_total']
 ```
+---
 
-For development:
-```bash
-pip install -e ".[dev]"  # pytest, black, mypy 포함
+## Project Structure
+
+```
+colregs-core/
+└── src/
+    └── colregs_core/
+        ├── reward/
+        │   ├── jeon_reward.py    # Implements JeonRewardCalculator
+        │   └── chun_reward.py    # Implements ChunRewardCalculator
+        └── risk/
+            └── ship_domain.py    # Implements JeonCollisionRisk
 ```

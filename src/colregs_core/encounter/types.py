@@ -34,7 +34,7 @@ class EncounterSituation(NamedTuple):
     """
     encounter_type: EncounterType
     relative_bearing: float  # degrees, [0, 360)
-    relative_course: float   # degrees, [-180, 180]
+    relative_course: float   # degrees, (-180, 180]
     distance: float          # meters
     aspect_angle: float      # TS의 aspect angle (degrees)
 

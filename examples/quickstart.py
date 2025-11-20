@@ -5,9 +5,9 @@ COLREGs Core - Quick Start Example
 """
 from colregs_core import (
     EncounterClassifier,
-    RiskAssessment,
-    heading_speed_to_velocity
+    RiskAssessment
 )
+from colregs_core.geometry import heading_speed_to_velocity
 import numpy as np
 
 def main():

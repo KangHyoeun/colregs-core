@@ -8,7 +8,6 @@ from .bearings import (
     heading_speed_to_velocity,
     velocity_to_heading_speed,
     calculate_aspect_angle,
-    calculate_bearing_rate,
 )
 
 from .coordinate_transform import (
@@ -31,7 +30,6 @@ __all__ = [
     'heading_speed_to_velocity',
     'velocity_to_heading_speed',
     'calculate_aspect_angle',
-    'calculate_bearing_rate',
     # coordinate_transform
     'ned_to_math_heading',
     'math_to_ned_heading',
