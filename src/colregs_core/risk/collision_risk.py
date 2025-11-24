@@ -13,7 +13,7 @@ import numpy as np
 from typing import Tuple, Optional, Dict
 from dataclasses import dataclass
 from .cpa_tcpa import calculate_cpa_tcpa
-from ..geometry import calculate_relative_bearing, velocity_to_heading_speed
+from ..geometry import calculate_relative_bearing
 from ..utils import WrapTo360
 from ..encounter.classifier import EncounterClassifier
 

@@ -23,7 +23,7 @@ sys.path.append('/home/hyo/PythonVehicleSimulator/src')
 sys.path.append('/home/hyo/DRL-otter-navigation')
 
 # Import colregs-core modules
-from colregs_core.utils import distance, cross_track_error
+from colregs_core.utils import calculate_distance, calculate_cte
 from colregs_core.geometry import (
     heading_speed_to_velocity, 
     math_to_ned_heading,
@@ -124,8 +124,8 @@ class COLREGsIntegrationTester:
         # Navigation metrics
         goal_position_math = [self.robot_goal[0, 0], self.robot_goal[1, 0]]
         goal_position = list(math_to_maritime_position(goal_position_math[0], goal_position_math[1]))
-        dist_to_goal = distance(os_position, goal_position)
-        y_e = cross_track_error(self.start_position, goal_position, os_position)
+        dist_to_goal = calculate_distance(os_position, goal_position)
+        y_e = calculate_cte(self.start_position, goal_position, os_position)
         
         # Target Ships (TS) data - find all dynamic obstacles
         ts_list = []
@@ -232,15 +232,15 @@ class COLREGsIntegrationTester:
         goal_position_math = [self.robot_goal[0, 0], self.robot_goal[1, 0]]
         goal_position = list(math_to_maritime_position(goal_position_math[0], goal_position_math[1]))
         
-        dist_calculated = distance(os['position'], goal_position)
+        dist_calculated = calculate_distance(os['position'], goal_position)
         
         print(f"Distance calculation (NED):")
         print(f"  OS position: {os['position']}")
         print(f"  Goal position: {goal_position}")
         print(f"  Distance: {dist_calculated:.2f} m")
         
-        # Test cross_track_error function
-        y_e_calculated = cross_track_error(
+        # Test calculate_cte function
+        y_e_calculated = calculate_cte(
             self.start_position, 
             goal_position, 
             os['position']
@@ -387,7 +387,7 @@ class COLREGsIntegrationTester:
         reward_dict = jeon_reward.calculate_total_reward(
             current_distance=nav['distance_to_goal'],
             previous_distance=prev_distance,
-            cross_track_error=nav['cross_track_error'],
+            cross_track_error=nav['calculate_cte'],
             os_speed=os['speed'],
             os_position=os['position'],
             os_velocity=os['velocity'],

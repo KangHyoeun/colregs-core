@@ -9,7 +9,7 @@ from ..geometry import (
     calculate_relative_bearing,
     calculate_aspect_angle,
 )
-from ..utils import WrapTo360, distance
+from ..utils import WrapTo360, calculate_distance
 
 class EncounterClassifier:
     """
@@ -48,7 +48,7 @@ class EncounterClassifier:
 
     def __init__(
         self,
-        safe_distance: float = 2000.0,  # meters
+        safe_distance: float = 1000.0,  # meters
         overtaking_tolerance: float = 0.0  # additional tolerance
     ):
         """
@@ -93,7 +93,7 @@ class EncounterClassifier:
             raise ValueError(f"ts_position must be a tuple/list of length 2. Got {ts_position}")
         
         # 거리 계산
-        current_distance = distance(os_position, ts_position)
+        current_distance = calculate_distance(os_position, ts_position)
         
         # 안전 거리 밖이면 SAFE
         if current_distance > self.safe_distance:

@@ -21,6 +21,7 @@ from .coordinate_transform import (
     math_relative_angle,
     math_to_maritime_velocity,
     maritime_to_math_velocity,
+    world_to_grid
 )
 
 __all__ = [
@@ -41,4 +42,5 @@ __all__ = [
     'math_relative_angle',
     'math_to_maritime_velocity',
     'maritime_to_math_velocity',
+    'world_to_grid'
 ]

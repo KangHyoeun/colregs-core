@@ -6,97 +6,110 @@ import time
 from typing import Any
 import math
 
+def wrap_angle(angle, unit='rad', positive=False):
+    """
+    Wraps an angle to the range (-limit, limit], where limit is pi for radians or 180 for degrees.
 
-def WrapToPi(rad, positive=False):
-    """The function `WrapToPi` transforms an angle in radians to the range [-pi, pi].
+    This uses a trigonometric identity to correctly and efficiently wrap the angle.
 
     Args:
-
-        rad (float): Angle in radians.
-            The `rad` parameter in the `WrapToPi` function represents an angle in radians that you want to
-        transform to the range [-π, π]. The function ensures that the angle is within this range by wrapping
-        it around if it exceeds the bounds.
-
-        positive (bool): Whether to return the positive value of the angle. Useful for angles difference.
+        angle (float): The angle value.
+        unit (str): The unit of the angle, either 'rad' for radians or 'deg' for degrees.
+        positive (bool): If True, returns the absolute value of the wrapped angle.
 
     Returns:
-        The function `WrapToPi(rad)` returns the angle `rad` wrapped to the range [-pi, pi].
-
+        float: The wrapped angle in the same unit.
     """
-    while rad > pi:
-        rad = rad - 2 * pi
-    while rad < -pi:
-        rad = rad + 2 * pi
+    if unit == 'rad':
+        # np.arctan2(sin(angle), cos(angle)) wraps angle to (-pi, pi]
+        wrapped_angle = np.arctan2(np.sin(angle), np.cos(angle))
+    elif unit == 'deg':
+        # Convert to radians, wrap, then convert back to degrees
+        rad = np.deg2rad(angle)
+        wrapped_rad = np.arctan2(np.sin(rad), np.cos(rad))
+        wrapped_angle = np.rad2deg(wrapped_rad)
+    else:
+        raise ValueError("Unit must be 'rad' or 'deg'.")
+        
+    return abs(wrapped_angle) if positive else wrapped_angle
 
-    return rad if not positive else abs(rad)
+
+def angle_difference(angle1, angle2, unit='rad'):
+    """
+    Calculates the shortest difference between two angles (angle1 - angle2).
+
+    The result is wrapped to the range (-pi, pi] for radians or (-180, 180] for degrees.
+    A positive result means angle1 is clockwise from angle2 (in a standard mathematical frame).
+    A negative result means angle1 is counter-clockwise from angle2.
+
+    Args:
+        angle1 (float): The first angle.
+        angle2 (float): The second angle.
+        unit (str): The unit of the angles, 'rad' or 'deg'.
+
+    Returns:
+        float: The wrapped angle difference.
+    """
+    diff = angle1 - angle2
+    return wrap_angle(diff, unit=unit)
+
+
+def WrapToPi(rad, positive=False):
+    """The function `WrapToPi` transforms an angle in radians to the range (-pi, pi]."""
+    return wrap_angle(rad, unit='rad', positive=positive)
 
 
 def WrapToRegion(rad, range):
     """
-    Transform an angle to a defined range, with length of 2*pi.
-
-    Args:
-        rad (float): Angle in radians.
-        range (list): List defining the range [min, max].
-
-    Returns:
-        float: Wrapped angle.
+    Transform an angle in radians to a defined range [min, max).
+    The range must have a length of 2*pi.
     """
-    assert len(range) >= 2 and range[1] - range[0] == 2 * pi
-    while rad > range[1]:
-        rad = rad - 2 * pi
-    while rad < range[0]:
-        rad = rad + 2 * pi
-    return rad
+    min_val, max_val = range
+    if not np.isclose(max_val - min_val, 2 * np.pi):
+        raise ValueError("The range for WrapToRegion must have a length of 2*pi.")
+        
+    return wrap_to_range(rad, min_val, max_val)
 
 def WrapTo180(deg, positive=False):
-    """
-    Transform an angle to the range (-180, 180].
-    """
-    while deg > 180:
-        deg = deg - 360
-    while deg < -180:
-        deg = deg + 360
+    """Transform an angle to the range (-180, 180]."""
+    return wrap_angle(deg, unit='deg', positive=positive)
 
-    return deg if not positive else abs(deg)
+
+def wrap_to_range(angle, min_val, max_val):
+    """
+    Wraps an angle to a given range [min_val, max_val).
+
+    The length of the range (max_val - min_val) is assumed to be a full circle (2*pi or 360).
+
+    Args:
+        angle (float): The angle value to wrap.
+        min_val (float): The minimum value of the range (inclusive).
+        max_val (float): The maximum value of the range (exclusive).
+
+    Returns:
+        float: The wrapped angle.
+    """
+    span = max_val - min_val
+    if span <= 0:
+        raise ValueError("max_val must be greater than min_val.")
+        
+    # Wrap the angle to the range [min_val, max_val)
+    wrapped = (angle - min_val) % span + min_val
+    
+    # Snap to min_val if the result is very close to max_val (due to float inaccuracies)
+    if np.isclose(wrapped, max_val):
+        return min_val
+        
+    return wrapped
 
 
 def WrapTo360(deg):
     """
-    Transform an angle to the range [0, 360).
-    
-    Notes:
-        - 0° ≤ result < 360°
-        - 360° is wrapped to 0°
-        - Handles floating-point precision issues
-    
-    Examples:
-        >>> WrapTo360(0.0)
-        0.0
-        >>> WrapTo360(360.0)
-        0.0
-        >>> WrapTo360(-0.0000001)
-        0.0
-        >>> WrapTo360(359.9999999)
-        359.9999999
+    Transform an angle in degrees to the range [0, 360).
     """
-    # [0, 360) 범위로 wrapping
-    # Use fmod for floating point modulo, which handles negative numbers correctly
-    # and ensures result is in (-360, 360)
-    deg = math.fmod(deg, 360.0)
-    
-    # Ensure positive result for [0, 360) range
-    if deg < 0:
-        deg += 360.0
-    
-    # 부동소수점 오차 처리: 0° 또는 360° 근처는 0°로 정규화
-    eps = 1e-6 # Increased epsilon to handle larger floating-point inaccuracies
-    if abs(deg) < eps or abs(deg - 360.0) < eps:
-        return 0.0
-    
-    return deg
+    return wrap_to_range(deg, 0.0, 360.0)
 
-def distance(point1, point2):
+def calculate_distance(point1, point2):
     """
     Compute the distance between two points.
 
@@ -107,121 +120,52 @@ def distance(point1, point2):
     Returns:
         float: Distance between points.
     """
-    # Handle different input types
-    if isinstance(point1, (list, tuple)):
-        x1, y1 = float(point1[0]), float(point1[1])
-    elif isinstance(point1, np.ndarray):
-        if point1.ndim == 1:
-            x1, y1 = float(point1[0]), float(point1[1])
-        else:
-            x1, y1 = float(point1[0, 0]), float(point1[1, 0])
-    else:
-        x1, y1 = float(point1[0]), float(point1[1])
-    
-    if isinstance(point2, (list, tuple)):
-        x2, y2 = float(point2[0]), float(point2[1])
-    elif isinstance(point2, np.ndarray):
-        if point2.ndim == 1:
-            x2, y2 = float(point2[0]), float(point2[1])
-        else:
-            x2, y2 = float(point2[0, 0]), float(point2[1, 0])
-    else:
-        x2, y2 = float(point2[0]), float(point2[1])
-    
-    return dist_hypot(x1, y1, x2, y2)
+    # Normalize inputs to 2-element NumPy arrays
+    p1 = np.asarray(point1, dtype=float).flatten()[:2]
+    p2 = np.asarray(point2, dtype=float).flatten()[:2]
 
+    return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
 
-def dist_hypot(x1, y1, x2, y2):
-    return math.hypot(x2 - x1, y2 - y1)
-
-def cross_track_error(start_position, goal_position, os_position):
+def calculate_cte(start_position, goal_position, os_position):
     """
-    Compute the signed cross-track error (CTE) - perpendicular distance from OS to the reference path.
-    
-    The reference path is defined as the straight line from start_position to goal_position.
-    - Positive CTE: OS is to the right of the reference path.
+    Compute the signed cross-track error (CTE) using a vector-based calculation.
+
+    The reference path is the straight line from start_position to goal_position.
+    - Positive CTE: OS is to the right of the reference path (in NED coordinates).
     - Negative CTE: OS is to the left of the reference path.
-    
-    Notes:
-        - In NED coordinates: (x=North, y=East)
-        - CTE = 0 means OS is exactly on the reference path
-        - Uses point-to-line distance formula
-    """
-    from shapely.geometry import LineString, Point
-    
-    # Convert inputs to tuples if they are numpy arrays
-    if isinstance(start_position, np.ndarray):
-        if start_position.shape == (2, 1):
-            start = (start_position[0, 0], start_position[1, 0])
-        else:
-            start = tuple(start_position)
-    else:
-        start = tuple(start_position)
-    
-    if isinstance(goal_position, np.ndarray):
-        if goal_position.shape == (2, 1):
-            goal = (goal_position[0, 0], goal_position[1, 0])
-        elif goal_position.shape == (3, 1):
-            # Handle [x, y, theta] format - only use x, y
-            goal = (goal_position[0, 0], goal_position[1, 0])
-        elif goal_position.ndim == 1:
-            # 1D array - take first 2 elements
-            goal = (float(goal_position[0]), float(goal_position[1]))
-        else:
-            # 2D array - take first 2 elements from first column
-            goal = (float(goal_position[0, 0]), float(goal_position[1, 0]))
-    else:
-        # List or tuple - take first 2 elements
-        if len(goal_position) >= 2:
-            goal = (float(goal_position[0]), float(goal_position[1]))
-        else:
-            goal = tuple(goal_position)
-    
-    if isinstance(os_position, np.ndarray):
-        if os_position.shape == (2, 1):
-            os = (os_position[0, 0], os_position[1, 0])
-        else:
-            os = tuple(os_position)
-    else:
-        os = tuple(os_position)
-    
-    # Create reference path (straight line from start to goal)
-    ref_path = LineString([start, goal])
-    
-    # Create point for OS position
-    os_point = Point(os)
-    
-    # Calculate unsigned perpendicular distance
-    unsigned_cte = ref_path.distance(os_point)
-    
-    # If distance is negligible, CTE is 0
-    if unsigned_cte < 1e-6:
-        return 0.0
-        
-    # Determine the sign of the CTE using the 2D cross-product method
-    # z = (x_g - x_s) * (y_o - y_s) - (y_g - y_s) * (x_o - x_s)
-    # In NED: x is North, y is East. A positive z means OS is to the right of the path.
-    dx_path = goal[0] - start[0]
-    dy_path = goal[1] - start[1]
-    dx_os = os[0] - start[0]
-    dy_os = os[1] - start[1]
-    
-    cross_product = dx_path * dy_os - dy_path * dx_os
-    
-    # Get the sign (-1, 0, or 1)
-    sign = np.sign(cross_product)
-    
-    # If the path has no length, sign cannot be determined, return unsigned cte
-    if dx_path**2 + dy_path**2 < 1e-6:
-        return unsigned_cte
 
-    # Combine sign and magnitude
-    signed_cte = unsigned_cte * sign
+    Notes:
+        - Assumes NED coordinates (x=North, y=East).
+        - CTE = 0 means OS is exactly on the reference path.
+        - This implementation is optimized to use NumPy and avoids heavy dependencies.
+    """
+    # Normalize inputs to 2-element NumPy arrays
+    start = np.asarray(start_position, dtype=float).flatten()[:2]
+    goal = np.asarray(goal_position, dtype=float).flatten()[:2]
+    os_pos = np.asarray(os_position, dtype=float).flatten()[:2]
+
+    # Vectors for path and OS position relative to the start
+    path_vec = goal - start
+    os_vec = os_pos - start
+
+    # Length of the path segment
+    path_len = np.linalg.norm(path_vec)
+
+    # If the path has negligible length, CTE is the distance from start to OS
+    if path_len < 1e-6:
+        return np.linalg.norm(os_vec)
+
+    # 2D cross-product gives signed area; dividing by path length gives signed distance (CTE)
+    # The sign indicates which side of the line the point is on.
+    # In NED (x=N, y=E), a positive cross product (path_vec[0]*os_vec[1] - path_vec[1]*os_vec[0])
+    # means the OS is to the East (right) of the path if heading North.
+    cross_product = np.cross(path_vec, os_vec)
+    
+    signed_cte = cross_product / path_len
     
     return signed_cte
 
-
-def ref_course_angle(start_position, goal_position):
+def calculate_ref_path(start_position, goal_position):
     """
     Calculate reference course angle from start to goal position in NED coordinates.
     
@@ -229,35 +173,41 @@ def ref_course_angle(start_position, goal_position):
     goal position, representing the optimal straight-line path direction (χ_path).
     
     Notes:
-        - Uses NED (North-East-Down) coordinate system
-        - Heading is measured clockwise from North
-        - This angle represents χ_path in Woo & Kim (2020)
-    
-    Example:
-        >>> start = (0.0, 0.0)
-        >>> goal = (100.0, 0.0)  # 100m north
-        >>> ref_course_angle(start, goal)
-        0.0  # North direction (degrees)
-        
-        >>> goal = (0.0, 100.0)  # 100m east
-        >>> ref_course_angle(start, goal)
-        90.0  # East direction (degrees)
+        - Uses NED (North-East-Down) coordinate system (x=North, y=East).
+        - Heading is measured clockwise from North.
+        - Result is in degrees.
     """
-    # Normalize input format
-    if isinstance(start_position, (tuple, list)):
-        start_x, start_y = start_position[0], start_position[1]
-    else:
-        start_x = start_position[0, 0] if start_position.shape == (2, 1) else start_position[0]
-        start_y = start_position[1, 0] if start_position.shape == (2, 1) else start_position[1]
-    
-    if isinstance(goal_position, (tuple, list)):
-        goal_x, goal_y = goal_position[0], goal_position[1]
-    else:
-        goal_x = goal_position[0, 0] if goal_position.shape == (2, 1) else goal_position[0]
-        goal_y = goal_position[1, 0] if goal_position.shape == (2, 1) else goal_position[1]
+    # Normalize inputs to 2-element NumPy arrays
+    start = np.asarray(start_position, dtype=float).flatten()[:2]
+    goal = np.asarray(goal_position, dtype=float).flatten()[:2]
     
     # Calculate delta in NED coordinates
-    dx = goal_x - start_x  # North direction change
-    dy = goal_y - start_y  # East direction change
+    dx = goal[0] - start[0]  # North direction change
+    dy = goal[1] - start[1]  # East direction change
     
+    # atan2(dy, dx) gives the angle in radians from the positive x-axis (North).
+    # np.degrees converts it to degrees.
+    return np.degrees(np.arctan2(dy, dx))
+
+def calculate_desired_course_angle(os_position,
+                                   start_position, goal_position, 
+                                   chi_inf=1, k=1):
+    
+    chi_path = calculate_ref_path(start_position, goal_position)
+    
+    e_y = calculate_cte(start_position, goal_position, os_position)
+
+    chi_d = chi_inf * math.atan(k * e_y) + chi_path
+
+    return np.degrees(chi_d)
+    
+def chi_angle(os_position, previous_position):
+
+    # Normalize inputs to 2-element NumPy arrays
+    next_pos = np.asarray(os_position, dtype=float).flatten()[:2]
+    pos = np.asarray(previous_position, dtype=float).flatten()[:2]
+
+    dx = next_pos[0] - pos[0]  # North direction change
+    dy = next_pos[1] - pos[1]  # East direction change
+
     return np.degrees(np.arctan2(dy, dx))

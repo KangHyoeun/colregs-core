@@ -11,7 +11,7 @@ from .cpa_tcpa import (
     calculate_cpa_tcpa
 )
 
-from .ship_domain import (
+from .collision_risk import (
     ShipDomainParams,
     ChunCollisionRisk,
     JeonCollisionRisk,

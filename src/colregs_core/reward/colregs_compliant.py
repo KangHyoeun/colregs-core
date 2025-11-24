@@ -4,7 +4,7 @@ COLREGs 규칙에 따른 올바른 회피 기동을 수행하는지 평가하는
 import numpy as np
 from typing import Tuple, Optional, Dict
 from ..encounter.types import EncounterType
-from ..utils import ref_course_angle, WrapTo180, WrapTo360
+from ..utils import calculate_ref_path, WrapTo180
 
 
 class ColregsCompliant:
@@ -74,7 +74,7 @@ class ColregsCompliant:
         Returns:
             True if course angle change ≥ 30° to starboard
         """
-        ref_course = ref_course_angle(start_position, goal_position)  # Return degrees
+        ref_course = calculate_ref_path(start_position, goal_position)  # Return degrees
         # χ^avoid: course angle change from reference path
         # Use WrapTo180 to distinguish starboard (+) from port (-)
         course_angle = WrapTo180(os_heading - ref_course)
@@ -103,7 +103,7 @@ class ColregsCompliant:
         Returns:
             True if course angle change ≥ 75° to starboard
         """
-        ref_course = ref_course_angle(start_position, goal_position)
+        ref_course = calculate_ref_path(start_position, goal_position)
         # χ^avoid: course angle change from reference path
         # Use WrapTo180 to distinguish starboard (+) from port (-)
         course_angle = WrapTo180(os_heading - ref_course)
@@ -170,7 +170,7 @@ class ColregsCompliant:
         Returns:
             True if |course angle change| ≥ 45° (either direction)
         """
-        ref_course = ref_course_angle(start_position, goal_position)
+        ref_course = calculate_ref_path(start_position, goal_position)
         # χ^avoid: course angle change from reference path
         # Use WrapTo180 to get proper angle difference [-180, 180]
         course_angle = WrapTo180(os_heading - ref_course)

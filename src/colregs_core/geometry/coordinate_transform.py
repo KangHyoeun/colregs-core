@@ -205,6 +205,51 @@ def maritime_to_math_velocity(maritime_deg: float, speed: float) -> Tuple[float,
     return (vx_east, vy_north)
 
 # ========================================
+# Inertial World to Body-Fixed Grid  
+# ========================================
+
+def world_to_grid(os_position: np.ndarray, os_heading: float, 
+                  ts_position: np.ndarray, grid_size: int, observation_distance: float) -> Tuple[int, int]:
+    """
+    Convert TS position (world coordinates) to grid coordinates
+    
+    Args:
+        ts_position: [N, E] in NED (meters)
+        os_position: [N, E] in NED (meters)
+        os_heading: OS heading (degrees, 0=North)
+        grid_size: Grid dimension (N×N)
+        observation_distance: Grid coverage (meters)
+    
+    Returns:
+        (grid_x, grid_y) or None if out of range
+    """
+    # 1. Calculate relative position (NED frame)
+    rel_n = ts_position[0] - os_position[0]  # North
+    rel_e = ts_position[1] - os_position[1]  # East
+    
+    # 2. Rotate to body-fixed frame (OS heading = up)
+    heading_rad = np.radians(os_heading)
+    
+    # Body frame: x=forward, y=right
+    # Grid frame: x=right, y=up (forward)
+    body_x = rel_e * np.cos(heading_rad) - rel_n * np.sin(heading_rad)
+    body_y = rel_e * np.sin(heading_rad) + rel_n * np.cos(heading_rad)
+    
+    # 3. Convert to grid coordinates
+    # Grid center = OS position
+    cell_size = observation_distance / grid_size
+    half_range = observation_distance / 2
+    
+    grid_x = int((body_x + half_range) / cell_size)
+    grid_y = int((body_y + half_range) / cell_size)
+    
+    # 4. Check if within grid
+    if 0 <= grid_x < grid_size and 0 <= grid_y < grid_size:
+        return (grid_x, grid_y)
+    else:
+        return None  # Out of observation range
+
+# ========================================
 # Test Functions  
 # ========================================
 

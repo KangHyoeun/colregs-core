@@ -12,7 +12,7 @@ from typing import Tuple, Optional, Dict, List
 from ..risk import JeonCollisionRisk, ChunCollisionRisk, ShipDomainParams
 from ..encounter.types import EncounterType
 from ..encounter.classifier import EncounterClassifier
-from ..geometry import velocity_to_heading_speed
+from ..utils import WrapTo180
 from .colregs_compliant import ColregsCompliant
 
 
@@ -366,8 +366,8 @@ class ChunRewardCalculator:
         if previous_heading is None:
             return 0.0
         
-        # Calculate heading difference
-        phi_diff = abs(os_heading - previous_heading)
+        # Calculate heading difference (handle 0/360 boundary)
+        phi_diff = abs(WrapTo180(os_heading - previous_heading))
         
         # Chun 2024 formula (Eq. 14):
         if phi_diff < 1e-6:
@@ -415,8 +415,8 @@ class ChunRewardCalculator:
         if previous_heading is None:
             return 0.0
         
-        # Calculate heading difference
-        phi_diff = abs(os_heading - previous_heading)
+        # Calculate heading difference (handle 0/360 boundary)
+        phi_diff = abs(WrapTo180(os_heading - previous_heading))
         
         # If CR is low (safe situation), reward maintaining direction
         # If CR is high (collision risk), allow heading changes

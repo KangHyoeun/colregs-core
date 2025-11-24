@@ -12,7 +12,7 @@ from typing import Tuple, Optional, Dict
 from ..risk import JeonCollisionRisk, ChunCollisionRisk, ShipDomainParams
 from ..encounter.types import EncounterType
 from ..encounter.classifier import EncounterClassifier
-from ..geometry import velocity_to_heading_speed
+from ..utils import WrapTo180
 from .colregs_compliant import ColregsCompliant
 
 
@@ -308,7 +308,10 @@ class JeonRewardCalculator:
         if previous_heading is None:
             return 0.0
         
-        phi_diff = abs(os_heading - previous_heading)
+        # Use WrapTo180 to handle 0/360 degree boundary crossing
+        # e.g., 359 -> 1 should be diff of 2, not 358
+        phi_diff = abs(WrapTo180(os_heading - previous_heading))
+        
         if phi_diff < 1e-6:
             return 1.0
         elif phi_diff > self.phi_max:
@@ -316,6 +319,34 @@ class JeonRewardCalculator:
         else:
             r_heading = 1.0 - 2.0 * phi_diff / self.phi_max
             return np.clip(r_heading, -1.0, 1.0)
+    
+    def calculate_yawrate_penalty(
+        self,
+        current_yaw_rate: float,
+        cr: float,
+        max_yaw_rate: float = 0.0873  # 5 deg/s in rad/s
+    ) -> float:
+        """
+        직진 구간에서 불필요한 yaw rate 억제
+        
+        Args:
+            current_yaw_rate: Current yaw rate (rad/s)
+            cr: Collision Risk [0, 1]
+            max_yaw_rate: Maximum expected yaw rate (rad/s)
+        
+        Returns:
+            Penalty [-1, 0]
+            - CR이 낮은 직진 구간에서 yaw rate가 클수록 큰 패널티
+        """
+        # CR이 높으면 (회피 중) 패널티 완화
+        if cr > self.cr_allowable:
+            return 0.0
+        
+        # CR이 낮은 직진 구간에서는 yaw rate 억제
+        yaw_rate_ratio = abs(current_yaw_rate) / max_yaw_rate
+        penalty = -yaw_rate_ratio  # [0, -1]
+        
+        return np.clip(penalty, -1.0, 0.0)
     
     def calculate_total_reward(
         self,
@@ -385,6 +416,12 @@ class JeonRewardCalculator:
             os_heading, previous_heading
         )
 
+        # Yaw rate penalty (optional - only use if needed)
+        # Get current yaw rate from os_velocity if available
+        # For now, we'll skip this in total calculation
+        # To enable: pass os_yaw_rate as parameter and uncomment below
+        # r_yawrate = self.calculate_yawrate_penalty(os_yaw_rate, cr)
+        
         r_safety = r_risk + r_colregs + r_heading
         
         # Total reward
