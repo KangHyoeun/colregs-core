@@ -243,6 +243,16 @@ class ChunCollisionRisk:
             self.ship_domain
         )    
 
+        # Anisotropic Risk Implementation:
+        # Scale the coefficients based on the ratio of current domain radius to the bow radius.
+        # This effectively scales the "recognition distance" (d_obs) based on the ship domain shape.
+        # If the obstacle is in a direction where the domain is smaller (e.g., stern), 
+        # the effective d_obs becomes smaller, making the risk curve steeper/closer.
+        scale = domain_radius / self.ship_domain.r_bow
+        
+        a_dynamic = self.a_coeff * scale
+        b_dynamic = self.b_coeff * scale
+
         result = self.encounter_classifier.classify(
             os_position,
             os_heading,
@@ -262,8 +272,8 @@ class ChunCollisionRisk:
         
         # Paper Eq. (6): CR = f_angle · exp(-DCPA/a) · exp(-TCPA/b)
         # Note: Use abs(tcpa) for TCPA term since when TCPA < 0, risk should decrease as time passes
-        cr_dcpa = np.exp(-dcpa / self.a_coeff)
-        cr_tcpa = np.exp(-abs(tcpa) / self.b_coeff)
+        cr_dcpa = np.exp(-dcpa / a_dynamic)
+        cr_tcpa = np.exp(-abs(tcpa) / b_dynamic)
         cr = f_angle * cr_dcpa * cr_tcpa
         
         return {
@@ -275,7 +285,9 @@ class ChunCollisionRisk:
             'ship_domain_radius': domain_radius,
             'f_angle': f_angle,
             'cr_dcpa_component': cr_dcpa,
-            'cr_tcpa_component': cr_tcpa
+            'cr_tcpa_component': cr_tcpa,
+            'a_dynamic': a_dynamic,
+            'b_dynamic': b_dynamic
         }
 
 
@@ -343,8 +355,8 @@ class JeonCollisionRisk:
         if os_speed is not None and ts_speed is not None:
             self.c_tcpa = -d_obs / (denominator * (os_speed + ts_speed))
         else:
-            # Default: assume typical speeds (e.g., 5 m/s each)
-            default_speed = 2.0  # m/s
+            # Default: assume typical speeds (e.g., 3 m/s each)
+            default_speed = 3.0  # m/s
             self.c_tcpa = -d_obs / (denominator * (default_speed + default_speed))
 
         self.encounter_classifier = EncounterClassifier()
@@ -388,6 +400,11 @@ class JeonCollisionRisk:
             self.ship_domain
         )     
 
+        # Anisotropic Risk Implementation:
+        scale = domain_radius / self.ship_domain.r_bow
+        c_dcpa_dynamic = self.c_dcpa * scale
+        c_tcpa_dynamic = self.c_tcpa * scale
+
         result = self.encounter_classifier.classify(
             os_position,
             os_heading,
@@ -400,8 +417,8 @@ class JeonCollisionRisk:
         
         # Paper Eq. (3): CR = cos( (π/2) * (1 - exp( - ( (TCPA / c_TCPA) + (DCPA / c_DCPA) ) ) ) )
         # Note: TCPA can be negative (already passed CPA), use absolute value
-        tcpa_norm = abs(tcpa) / self.c_tcpa if self.c_tcpa > 0 else 0.0
-        dcpa_norm = dcpa / self.c_dcpa if self.c_dcpa > 0 else 0.0
+        tcpa_norm = abs(tcpa) / c_tcpa_dynamic if c_tcpa_dynamic > 0 else 0.0
+        dcpa_norm = dcpa / c_dcpa_dynamic if c_dcpa_dynamic > 0 else 0.0
         
         # Inner exponential: exp(-(TCPA/c_TCPA + DCPA/c_DCPA))
         inner_exp = np.exp(-(tcpa_norm + dcpa_norm))
@@ -418,5 +435,7 @@ class JeonCollisionRisk:
             'ship_domain_radius': domain_radius,
             'tcpa_norm': tcpa_norm,
             'dcpa_norm': dcpa_norm,
-            'inner_exp': inner_exp
+            'inner_exp': inner_exp,
+            'c_dcpa_dynamic': c_dcpa_dynamic,
+            'c_tcpa_dynamic': c_tcpa_dynamic
         }

@@ -234,56 +234,46 @@ class JeonRewardCalculator:
     
     def calculate_colregs_reward(
         self,
-        os_heading: float,
         cr: float,
         tcpa: float,
-        start_position: Tuple[float, float],
-        goal_position: Tuple[float, float],
         encounter_type: Optional[EncounterType] = None,
-        is_static_obstacle: bool = False
+        is_static_obstacle: bool = False,
+        relative_course: Optional[float] = None,
     ) -> float:
         """
         Paper Formula (Eq. 24):
         R_COLREGs = 1    if CR <= CR_obs or satisfies rules
         R_COLREGs = -1   otherwise
         
-        According to the paper:
-        - R_COLREGs = 1 if:
-          * TS's collision risk is lower than CR_obs (safe situation), OR
-          * OS undertook a rule-compliant move in a collision avoidance situation
-            where CR > CR_obs
-        - R_COLREGs = -1 if:
-          * In a collision avoidance situation (CR > CR_obs), OS did not travel
-            according to COLREGs rules 12-17
+        Modified for Continuous Reward (Course Angle/TCPA):
+        - relative_course (reference path deviation) will be used to calculate steering reward based on course deviation
+        - tcpa_now will be used for overtaking situations
         
         Args:
             encounter_type: Optional encounter type. If None, automatically classified
                           using EncounterClassifier
-            os_heading: Own Ship heading (degrees)
+            relative_course: Own Ship course angle (degrees) relative to reference path. (+) for starboard, (-) for port.
         
         Returns:
-            COLREGs reward {-1, +1}
-            - CR <= CR_obs (안전) or is_compliant (규칙 준수): +1
-            - CR > CR_obs and not is_compliant (규칙 위반): -1
+            COLREGs reward {-1.0 ~ +1.0}
         """
 
-        # Check for COLREGs compliance
-        is_compliant = self.colregs_checker.is_compliant(
-            start_position=start_position,
-            goal_position=goal_position,
-            os_heading=os_heading,
+        # Check for COLREGs compliance (returns float score now)
+        compliance_reward = self.colregs_checker.is_compliant(
+            relative_course=relative_course,
             tcpa=tcpa,
             encounter_type=encounter_type,
             is_static_obstacle=is_static_obstacle
         )
 
-        # Paper formula (Eq. 24):
-        # R_COLREGs = 1 if CR <= CR_obs or satisfies rules (is_compliant)
-        if cr <= self.cr_allowable or is_compliant:
+        # 1. 안전하거나 이미 규정을 준수하여 회피한 상태 (CR 기준)
+        # CR이 낮으면 무조건 안전 보상
+        if cr <= self.cr_allowable:
             return 1.0
-        else:
-            # R_COLREGs = -1 otherwise (CR > CR_obs and not compliant)
-            return -1.0
+        
+        # 2. 회피가 필요한 상황 (CR > 0.3)
+        # ColregsCompliant가 계산한 연속 보상 반환 (-1.0 ~ +1.0)
+        return compliance_reward
 
     def calculate_heading_reward(
         self,
@@ -360,17 +350,15 @@ class JeonRewardCalculator:
         os_velocity: Tuple[float, float],
         os_heading: float,
         previous_heading: Optional[float],
-
         ts_speed: float,
         ts_position: Tuple[float, float],
         ts_velocity: Tuple[float, float],
         ts_heading: float,
         # COLREGs parameters
-        start_position: Tuple[float, float],
-        goal_position: Tuple[float, float],
         CR_max: float,
         encounter_type: Optional[EncounterType] = None,
         is_static_obstacle: bool = False,
+        relative_course: Optional[float] = None,
         # Weights
         w_efficiency: float = 1.0,
         w_safety: float = 1.0
@@ -406,11 +394,11 @@ class JeonRewardCalculator:
         # Safety rewards
         r_risk = self.calculate_risk_reward(cr)
         r_colregs = self.calculate_colregs_reward(
-            os_heading, cr, tcpa,
-            start_position,
-            goal_position,
-            encounter_type,
-            is_static_obstacle
+            cr=cr, 
+            tcpa=tcpa,
+            encounter_type=encounter_type,
+            is_static_obstacle=is_static_obstacle,
+            relative_course=relative_course
         )
         r_heading = self.calculate_heading_reward(
             os_heading, previous_heading
