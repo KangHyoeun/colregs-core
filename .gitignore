@@ -1,0 +1,25 @@
+# Environments
+/.venv/
+/env/
+/venv/
+
+# Python cache & Build
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Logs & Metrics
+/logs/
+
+# IDE & System
+.vscode/
+.idea/
+.DS_Store
+
+# Dependency lock file (optional, but good for reproducibility)
+poetry.lock

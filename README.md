@@ -1,117 +1,150 @@
-# COLREGs Core
+# COLREGs Core 🚢
 
-A Python library for calculating maritime collision risk and shaping rewards for DRL-based navigation, based on the International Regulations for Preventing Collisions at Sea (COLREGs).
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-This library provides modular components for assessing encounter situations and calculating rewards, designed for easy integration into DRL training environments like `DRL-otter-navigation`.
+**A Python library for maritime collision risk assessment and DRL reward shaping based on COLREGs.**
 
-## Key Features
-
--   **Multiple Reward Strategies:** Implements several reward calculation schemes from maritime robotics research, including:
-    -   `ChunRewardCalculator`: A multi-component reward function balancing efficiency and safety.
-    -   `JeonRewardCalculator`: A reward function based on a dynamic ship domain and collision risk.
--   **Collision Risk Modeling:** Includes the `JeonCollisionRisk` model, which uses concepts like TCPA, DCPA, and a dynamic ship domain to quantify collision risk.
--   **Easy Integration:** Designed to be easily instantiated and called within a DRL agent or environment's step function.
+`colregs-core` provides robust, modular components for evaluating maritime encounter situations (Head-on, Crossing, Overtaking) according to the **International Regulations for Preventing Collisions at Sea (COLREGs)**. It is specifically designed to facilitate **Deep Reinforcement Learning (DRL)** research for autonomous surface vehicles (ASVs/USVs).
 
 ---
 
-## Installation
+## 🌟 Key Features
 
-This project is managed with `poetry`.
+*   **COLREGs Encounter Classification:** accurately classifies encounter types (Head-on, Crossing Give-way/Stand-on, Overtaking) using relative bearing and course.
+*   **Collision Risk Assessment (CRI):** Implements advanced collision risk models, including **CPA/TCPA** calculations and **Dynamic Ship Domains**.
+*   **DRL Reward Shaping:** Provides pre-built, research-validated reward calculators (`JeonReward`, `ChunReward`) for training DRL navigation agents.
+*   **Coordinate System Support:** Handles conversions between **NED (North-East-Down)** maritime coordinates and standard mathematical coordinates.
+*   **Modular Design:** Easy to integrate into any simulation environment (e.g., `ir-sim`, `Gazebo`, `Unity`).
+
+---
+
+## 📦 Installation
+
+### Using Poetry (Recommended)
 
 ```bash
-# Navigate to the project directory
-cd /home/hyo/colregs-core
-
-# Activate your conda environment
-conda activate DRL-otter-nav
-
-# Install dependencies
+git clone https://github.com/your-username/colregs-core.git
+cd colregs-core
 poetry install
+```
+
+### Using Pip
+
+```bash
+pip install .
 ```
 
 ---
 
-## Core Components & Usage
+## 🚀 Quick Start
 
-The primary components you will use for DRL are the **Reward Calculators**. They encapsulate the complexity of risk assessment and COLREGs compliance into a single, easy-to-use-interface.
+### 1. Encounter Classification
 
-### 1. `JeonRewardCalculator`
+```python
+from colregs_core import EncounterClassifier
 
-This calculator uses the `JeonCollisionRisk` model to shape rewards. It heavily penalizes actions that lead to a high collision risk.
+classifier = EncounterClassifier()
 
-**Usage:**
+# Own Ship (OS) and Target Ship (TS) states
+# Position: (North, East) in meters, Heading: Degrees (0=North, Clockwise)
+situation = classifier.classify(
+    os_position=(0, 0), os_heading=0, os_speed=5.0,
+    ts_position=(500, 500), ts_heading=270, ts_speed=5.0
+)
+
+print(f"Encounter Type: {situation.encounter_type.name}")  # e.g., CROSSING_GIVE_WAY
+print(f"Relative Bearing: {situation.relative_bearing:.1f}°")
+print(f"Distance: {situation.distance:.1f} m")
+```
+
+### 2. Collision Risk Assessment
+
+```python
+from colregs_core import JeonCollisionRisk, ShipDomainParams
+
+# Define Ship Domain (Asymmetric)
+domain = ShipDomainParams(r_bow=30, r_stern=10, r_starboard=20, r_port=10)
+
+risk_model = JeonCollisionRisk(ship_domain=domain)
+
+risk = risk_model.calculate_collision_risk(
+    os_speed=5.0, os_position=(0, 0), os_velocity=(5, 0), os_heading=0,
+    ts_speed=5.0, ts_position=(500, 500), ts_velocity=(-5, 0), ts_heading=270
+)
+
+print(f"Collision Risk (0-1): {risk['cr']:.4f}")
+print(f"DCPA: {risk['dcpa']:.1f} m, TCPA: {risk['tcpa']:.1f} s")
+```
+
+### 3. DRL Reward Calculation
 
 ```python
 from colregs_core.reward import JeonRewardCalculator
 
-# Initialize the calculator
-# Speed parameters are for calibrating the risk model
-jeon_calculator = JeonRewardCalculator(
-    os_speed_for_cr=2.0,
-    ts_speed_for_cr=2.0,
-    w_dist=0.3,
-    w_coll=0.7
+# Initialize calculator
+reward_calc = JeonRewardCalculator(w_efficiency=1.0, w_safety=1.0)
+
+# Calculate reward at each step
+rewards = reward_calc.calculate_total_reward(
+    current_distance=100.0,
+    previous_distance=102.0,  # Approaching goal
+    cross_track_error=0.5,
+    os_speed=5.0,
+    # ... (other state parameters) ...
+    CR_max=0.2
 )
 
-# In your environment's step function, calculate the reward
-reward_dict = jeon_calculator.calculate_total_reward(
-    os_position=(0, 0),
-    os_velocity=(2.0, 0.0),
-    ts_position=(200, 0),
-    ts_velocity=(-2.0, 0.0),
-    dist_to_goal=50.0,
-    is_static_obstacle=False
-)
-
-total_reward = reward_dict['r_total']
+print(f"Total Reward: {rewards['r_total']:.4f}")
 ```
 
-### 2. `ChunRewardCalculator`
-
-This calculator provides a more granular reward, composed of distinct "efficiency" and "safety" components.
-
-**Usage:**
-
-```python
-from colregs_core.reward import ChunRewardCalculator
-
-# Initialize the calculator
-chun_calculator = ChunRewardCalculator(
-    d_max=20.0,
-    v_ref=2.0,
-    w_goal=0.4,
-    w_cross=0.2,
-    w_speed=0.2,
-    w_risk=0.2
-)
-
-# In your environment's step function, calculate the reward
-reward_dict = chun_calculator.calculate_total_reward(
-    goal_position=(1000, 0),
-    os_position=(0, 0),
-    os_velocity=(2.0, 0.0),
-    previous_distance=1000.0,
-    encounter_type=0, # Replace with actual encounter type
-    CR_max=0.1,
-    is_static_obstacle=False,
-    ts_position=(200, 0),
-    ts_velocity=(-2.0, 0.0),
-    os_heading=0.0
-)
-
-total_reward = reward_dict['r_total']
-```
 ---
 
-## Project Structure
+## 📚 Modules
 
-```
-colregs-core/
-└── src/
-    └── colregs_core/
-        ├── reward/
-        │   ├── jeon_reward.py    # Implements JeonRewardCalculator
-        │   └── chun_reward.py    # Implements ChunRewardCalculator
-        └── risk/
-            └── ship_domain.py    # Implements JeonCollisionRisk
-```
+| Module | Description |
+| :--- | :--- |
+| `colregs_core.encounter` | Classifies COLREGs situations (Rule 13, 14, 15). |
+| `colregs_core.risk` | Calculates Collision Risk Index (CRI), CPA, TCPA, and Ship Domains. |
+| `colregs_core.reward` | Provides reward functions for Reinforcement Learning (Jeon et al., Chun et al.). |
+| `colregs_core.geometry` | Handles coordinate transforms (NED ↔ Math) and vector calculations. |
+
+---
+
+## 📖 Documentation
+
+For detailed usage guides and API references, please check the [docs/](docs/) directory:
+
+*   [**Coordinate System Guide**](docs/COORDINATE_SYSTEM_GUIDE.md): Important notes on degree/radian and NED/Math conventions.
+*   [**COLREGs Rules**](docs/colregs_rules.md): Explanation of implemented maritime rules.
+*   [**Usage Guide**](docs/usage_guide.md): Detailed examples.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1.  Fork the repository.
+2.  Create a new feature branch (`git checkout -b feature/YourFeature`).
+3.  Commit your changes (`git commit -m 'Add some feature'`).
+4.  Push to the branch (`git push origin feature/YourFeature`).
+5.  Open a Pull Request.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🔗 Citation
+
+If you use this code for your research, please cite the following papers:
+
+*   **Chun et al. (2021).** "Deep reinforcement learning-based collision avoidance for an autonomous ship."
+*   **전도현. (2024).** "A Method for Collision Avoidance of a Ship Based on Reinforcement Learning in Complex Maritime Situations."
+*   **Chun et al. (2024).** "Method for collision avoidance based on deep reinforcement learning with path-speed control for an autonomous ship."
+*   **Woo and Kim (2020).** "Collision avoidance for an unmanned surface vehicle using deep reinforcement learning."
